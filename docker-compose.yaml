@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  rtsp-proxy:
+    build: .
+    container_name: rtsp-hls-proxy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # HTTP API and HLS serving
+      - "8080:8080"  # WebSocket (optional)
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - WS_PORT=8080
+    volumes:
+      - ./streams:/app/streams
+      - ./logs:/app/logs
+    networks:
+      - proxy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rtsp-proxy.rule=Host(`rtsp-proxy.yourdomain.com`)"
+      - "traefik.http.services.rtsp-proxy.loadbalancer.server.port=3000"
+
+networks:
+  proxy-network:
+    driver: bridge

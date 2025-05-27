@@ -19,10 +19,6 @@ services:
       - /volume1/docker/rtsp-proxy/streams:/app/streams
       - /volume1/docker/rtsp-proxy/logs:/app/logs
     working_dir: /app
-    command: >
-      sh -c "echo 'Starting server...' &&
-      node server.js
-      "
     healthcheck:
       test: curl -f http://localhost:3010/health || exit 1
 

@@ -19,32 +19,17 @@ services:
     working_dir: /app
     command: >
       sh -c "
-        apk add --no-cache ffmpeg &&
-        if [ ! -f package.json ]; then
-          echo 'First time setup...' &&
-          cat > package.json << 'EOF'
-      {
-        \"name\": \"rtsp-hls-proxy\",
-        \"version\": \"1.0.0\",
-        \"main\": \"server.js\",
-        \"dependencies\": {
-          \"express\": \"^4.18.2\",
-          \"cors\": \"^2.8.5\",
-          \"fluent-ffmpeg\": \"^2.1.2\",
-          \"ws\": \"^8.14.2\",
-          \"uuid\": \"^9.0.1\",
-          \"morgan\": \"^1.10.0\",
-          \"dotenv\": \"^16.3.1\"
-        }
-      }
-      EOF
-          npm install &&
-          echo 'Creating server files...' &&
-          wget -O server.js https://gist.githubusercontent.com/your-gist/raw/server.js &&
-          mkdir -p public &&
-          wget -O public/index.html https://gist.githubusercontent.com/your-gist/raw/index.html
-        fi &&
-        node server.js
+      apk add --no-cache ffmpeg &&
+      if [ ! -d node_modules ]; then
+        echo 'Installing dependencies...' &&
+        npm install
+      fi &&
+      echo 'Starting server...' &&
+      node server.js
       "
     healthcheck:
       test: curl -f http://localhost:3010/health || exit 1
+
+
+
+      

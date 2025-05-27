@@ -2,7 +2,9 @@ version: '3.9'
 
 services:
   rtsp-proxy:
-    build: .
+    build: 
+      context: .
+      dockerfile: dockerfile
     container_name: rtsp-hls-proxy
     restart: unless-stopped
     ports:

@@ -16,7 +16,13 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('combined'));
 app.use('/streams', express.static(path.join(__dirname, 'streams')));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve the web interface - create public directory if it doesn't exist
+const publicPath = path.join(__dirname, 'public');
+if (!fs.existsSync(publicPath)) {
+    fs.mkdirSync(publicPath, { recursive: true });
+}
+app.use(express.static(publicPath));
 
 // Store active streams
 const activeStreams = new Map();

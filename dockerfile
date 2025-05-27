@@ -11,17 +11,17 @@ RUN apk add --no-cache \
 # Create app directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package.json first
+COPY package.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies using npm install (more forgiving than npm ci)
+RUN npm install --only=production
 
 # Copy application files
 COPY . .
 
 # Create directories for HLS output and logs
-RUN mkdir -p /app/streams /app/logs
+RUN mkdir -p /app/streams /app/logs /app/public
 
 # Expose ports
 EXPOSE 3010 8090

@@ -2,32 +2,58 @@ version: '3.8'
 
 services:
   rtsp-proxy:
-    build: .
+    image: node:18-alpine
     container_name: rtsp-hls-proxy
     restart: unless-stopped
     ports:
-      - "3010:3010"  # HTTP API and HLS serving
-      - "8090:8090"  # WebSocket (optional)
+      - "3010:3010"
+      - "8090:8090"
     environment:
       - NODE_ENV=production
       - PORT=3010
       - WS_PORT=8090
     volumes:
-      - ./streams:/app/streams
-      - ./logs:/app/logs
-    networks:
-      - proxy-network
+      - rtsp-proxy-app:/app
+      - rtsp-proxy-streams:/app/streams
+      - rtsp-proxy-logs:/app/logs
+    working_dir: /app
+    command: >
+      sh -c "
+        apk add --no-cache ffmpeg &&
+        if [ ! -f package.json ]; then
+          echo 'First time setup...' &&
+          cat > package.json << 'EOF'
+      {
+        \"name\": \"rtsp-hls-proxy\",
+        \"version\": \"1.0.0\",
+        \"main\": \"server.js\",
+        \"dependencies\": {
+          \"express\": \"^4.18.2\",
+          \"cors\": \"^2.8.5\",
+          \"fluent-ffmpeg\": \"^2.1.2\",
+          \"ws\": \"^8.14.2\",
+          \"uuid\": \"^9.0.1\",
+          \"morgan\": \"^1.10.0\",
+          \"dotenv\": \"^16.3.1\"
+        }
+      }
+      EOF
+          npm install &&
+          echo 'Creating server files...' &&
+          wget -O server.js https://gist.githubusercontent.com/your-gist/raw/server.js &&
+          mkdir -p public &&
+          wget -O public/index.html https://gist.githubusercontent.com/your-gist/raw/index.html
+        fi &&
+        node server.js
+      "
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3010/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.rtsp-proxy.rule=Host(`rtsp-proxy.yourdomain.com`)"
-      - "traefik.http.services.rtsp-proxy.loadbalancer.server.port=3010"
+      start_period: 120s
 
-networks:
-  proxy-network:
-    driver: bridge
+volumes:
+  rtsp-proxy-app:
+  rtsp-proxy-streams:
+  rtsp-proxy-logs:

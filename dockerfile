@@ -24,7 +24,7 @@ COPY . .
 RUN mkdir -p /app/streams /app/logs /app/public
 
 # Expose ports
-EXPOSE 3010 8090
+EXPOSE 3000 8080
 
 # Run the application
 CMD ["node", "server.js"]

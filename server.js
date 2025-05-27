@@ -8,8 +8,8 @@ const morgan = require('morgan');
 const WebSocket = require('ws');
 
 const app = express();
-const PORT = process.env.PORT || 3010;
-const WS_PORT = process.env.WS_PORT || 8090;
+const PORT = process.env.PORT || 3000;
+const WS_PORT = process.env.WS_PORT || 8080;
 
 // Middleware
 app.use(cors());

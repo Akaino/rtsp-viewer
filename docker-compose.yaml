@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.9'
 
 services:
   rtsp-proxy:
@@ -12,7 +12,6 @@ services:
       - NODE_ENV=production
       - PORT=3010
       - WS_PORT=8090
-    network_mode: host
     volumes:
       - /volume1/docker/rtsp-proxy/app:/app
       - /volume1/docker/rtsp-proxy/streams:/app/streams
@@ -48,13 +47,4 @@ services:
         node server.js
       "
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3010/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
-
-volumes:
-  rtsp-proxy-app:
-  rtsp-proxy-streams:
-  rtsp-proxy-logs:
+      test: curl -f http://localhost:3010/health || exit 1

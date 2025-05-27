@@ -12,6 +12,7 @@ services:
       - NODE_ENV=production
       - PORT=3010
       - WS_PORT=8090
+    network_mode: host
     volumes:
       - /volume1/docker/rtsp-proxy-app:/app
       - /volume1/docker/rtsp-proxy-streams:/app/streams

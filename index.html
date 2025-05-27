@@ -229,7 +229,7 @@
             
             <div class="input-group">
                 <label for="proxyUrl">Proxy Server URL (optional):</label>
-                <input type="text" id="proxyUrl" placeholder="http://localhost:3000" value="http://localhost:3000">
+                <input type="text" id="proxyUrl" placeholder="http://localhost:3010" value="http://localhost:3010">
             </div>
             
             <div class="button-group">
@@ -285,7 +285,7 @@
         
         async function startStream() {
             const rtspUrl = rtspUrlInput.value.trim();
-            const proxyUrl = proxyUrlInput.value.trim() || 'http://localhost:3000';
+            const proxyUrl = proxyUrlInput.value.trim() || 'http://localhost:3010';
             
             if (!rtspUrl) {
                 updateStatus('Please enter an RTSP URL', 'error');
@@ -396,7 +396,7 @@
             videoPlayer.src = '';
             
             if (currentStreamId) {
-                const proxyUrl = proxyUrlInput.value.trim() || 'http://localhost:3000';
+                const proxyUrl = proxyUrlInput.value.trim() || 'http://localhost:3010';
                 
                 try {
                     await fetch(`${proxyUrl}/api/stream/stop`, {

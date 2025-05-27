@@ -12,7 +12,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy package.json first
-COPY package.json ./
+COPY package.json ./app/
 
 # Install dependencies using npm install (more forgiving than npm ci)
 RUN npm install --only=production

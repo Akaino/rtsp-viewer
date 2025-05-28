@@ -142,7 +142,7 @@ app.post('/api/stream', (req, res) => {
             streamUrl: `/streams/${streamId}/playlist.m3u8`,
             message: 'Stream processing started'
         });
-    }, 1000);
+    }, 3000);
 });
 
 app.post('/api/stream/stop', (req, res) => {

@@ -4,7 +4,7 @@ services:
   # RTSP Stream Backend Service
   rtsp-backend:
     build:
-      context: ./backend
+      context: /backend
       dockerfile: Dockerfile
     container_name: rtsp-stream-backend
     restart: unless-stopped
@@ -58,9 +58,9 @@ services:
       - /volume1/docker/rtsp-proxy/backend-app:/backend
       - /volume1/docker/rtsp-proxy/frontend-app:/frontend
       - /volume1/docker/rtsp-proxy/nginx-config:/nginx
-      - ./backend:/src/backend:ro
-      - ./frontend:/src/frontend:ro
-      - ./nginx.conf:/src/nginx.conf:ro
+      - /backend:/src/backend:ro
+      - /frontend:/src/frontend:ro
+      - /nginx.conf:/src/nginx.conf:ro
     command: |
       sh -c "
         echo 'Initializing volumes...'

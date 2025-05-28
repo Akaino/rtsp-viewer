@@ -36,9 +36,9 @@ services:
       - "80:80"
     volumes:
       # Use named volumes for Portainer compatibility
-      - frontend-app:/usr/share/nginx/html:ro
-      - nginx-config:/etc/nginx/conf.d:ro
-      - nginx-cache:/var/cache/nginx
+      - /volume1/docker/rtsp-proxy/frontend-app:/usr/share/nginx/html:ro
+      - /volume1/docker/rtsp-proxy/nginx-config:/etc/nginx/conf.d:ro
+      - /volume1/docker/rtsp-proxy/nginx-cache:/var/cache/nginx
     networks:
       - rtsp-network
     depends_on:

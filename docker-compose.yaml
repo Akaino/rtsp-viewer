@@ -47,7 +47,7 @@ services:
     container_name: rtsp-stream-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8090:80"
     volumes:
       # Synology absolute paths
       - /volume1/docker/rtsp-proxy/frontend:/usr/share/nginx/html:ro

@@ -23,9 +23,6 @@ RUN mkdir -p /usr/src/app/streams
 # Copy app source
 COPY server.js ./
 
-# Switch to non-root user
-USER nodejs
-
 # Expose ports
 EXPOSE 8080
 

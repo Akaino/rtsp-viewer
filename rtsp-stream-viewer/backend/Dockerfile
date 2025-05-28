@@ -13,10 +13,10 @@ RUN apk update && \
 WORKDIR /usr/src/app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json ./
 
 # Install app dependencies
-RUN npm ci --only=production
+RUN npm install --production
 
 # Create streams directory
 RUN mkdir -p /usr/src/app/streams

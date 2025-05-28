@@ -2,10 +2,11 @@
 FROM node:19-bullseye
 
 # Install FFmpeg and other dependencies
-RUN apk update 
-RUN apk add --update bash
-RUN apk add ffmpeg
-RUN apk add curl
+RUN apk upgrade --no-cache
+RUN apk update --no-cache
+RUN apk add --no-cache --update bash
+RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache curl
 
 # Create app directory
 WORKDIR /usr/src/app

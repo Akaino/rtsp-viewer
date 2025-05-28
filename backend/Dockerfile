@@ -1,11 +1,10 @@
 # Use Node.js 18 Alpine as base image
-FROM node:18-alpine
+FROM node:19-bullseye
 
 # Install FFmpeg and other dependencies
-RUN apk add --no-cache \
-    ffmpeg \
-    curl \
-    bash
+RUN apk add bash
+RUN apk add ffmpeg
+RUN apk add curl
 
 # Create app directory
 WORKDIR /usr/src/app

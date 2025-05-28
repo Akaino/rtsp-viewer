@@ -15,9 +15,9 @@ services:
       - PORT=8080
     volumes:
       # Use named volumes for Portainer compatibility
-      - backend-app:/usr/src/app
-      - stream-data:/usr/src/app/streams
-      - node-modules:/usr/src/app/node_modules
+      - /volume1/docker/rtsp-proxy/backend-app:/usr/src/app
+      - /volume1/docker/rtsp-proxy/stream-data:/usr/src/app/streams
+      - /volume1/docker/rtsp-proxy/node-modules:/usr/src/app/node_modules
     networks:
       - rtsp-network
     healthcheck:

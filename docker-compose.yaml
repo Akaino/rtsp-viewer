@@ -1,11 +1,9 @@
-version: '3.8'
+version: '2'
 
 services:
   # RTSP Stream Backend Service
   rtsp-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: node:18-alpine
     container_name: rtsp-stream-backend
     restart: unless-stopped
     ports:
@@ -14,18 +12,33 @@ services:
       - NODE_ENV=production
       - PORT=8080
     volumes:
-      # Use named volumes for Portainer compatibility
-      - /volume1/docker/rtsp-proxy/backend-app:/usr/src/app
-      - /volume1/docker/rtsp-proxy/stream-data:/usr/src/app/streams
-      - /volume1/docker/rtsp-proxy/node-modules:/usr/src/app/node_modules
+      # Synology absolute paths
+      - /volume1/docker/rtsp-proxy/backend/server.js:/usr/src/app/server.js:ro
+      - /volume1/docker/rtsp-proxy/backend/package.json:/usr/src/app/package.json:ro
+      - /volume1/docker/rtsp-proxy/streams:/usr/src/app/streams
+      - /volume1/docker/rtsp-proxy/node_modules:/usr/src/app/node_modules
     networks:
       - rtsp-network
+    working_dir: /usr/src/app
+    command: |
+      sh -c "
+        # Install FFmpeg if not present
+        which ffmpeg || (apk update && apk add --no-cache ffmpeg curl bash)
+        
+        # Install npm dependencies if needed
+        if [ ! -d node_modules ] || [ ! -f node_modules/.bin/nodemon ]; then
+          echo 'Installing npm dependencies...'
+          npm install --production
+        fi
+        
+        # Start the server
+        exec node server.js
+      "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
 
   # Web Frontend (Nginx)
   rtsp-frontend:
@@ -35,67 +48,20 @@ services:
     ports:
       - "80:80"
     volumes:
-      # Use named volumes for Portainer compatibility
-      - /volume1/docker/rtsp-proxy/frontend-app:/usr/share/nginx/html:ro
-      - /volume1/docker/rtsp-proxy/nginx-config:/etc/nginx/conf.d:ro
-      - /volume1/docker/rtsp-proxy/nginx-cache:/var/cache/nginx
+      # Synology absolute paths
+      - /volume1/docker/rtsp-proxy/frontend:/usr/share/nginx/html:ro
+      - /volume1/docker/rtsp-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - rtsp-network
     depends_on:
       - rtsp-backend
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-
-  # Initialize volumes with required files
-  init-volumes:
-    image: busybox:latest
-    container_name: rtsp-init-volumes
-    volumes:
-      - /volume1/docker/rtsp-proxy/backend-app:/backend
-      - /volume1/docker/rtsp-proxy/frontend-app:/frontend
-      - /volume1/docker/rtsp-proxy/nginx-config:/nginx
-      - /backend:/src/backend:ro
-      - /frontend:/src/frontend:ro
-      - /nginx.conf:/src/nginx.conf:ro
-    command: |
-      sh -c "
-        echo 'Initializing volumes...'
-        # Copy backend files
-        cp -f /src/backend/server.js /backend/
-        cp -f /src/backend/package.json /backend/
-        # Copy frontend files
-        cp -f /src/frontend/index.html /frontend/
-        cp -f /src/frontend/styles.css /frontend/
-        cp -f /src/frontend/app.js /frontend/
-        # Copy nginx config
-        cp -f /src/nginx.conf /nginx/default.conf
-        echo 'Volume initialization complete!'
-      "
-    restart: "no"
 
 # Networks
 networks:
   rtsp-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
-
-# Volumes - all named for Portainer management
-volumes:
-  backend-app:
-    driver: local
-  frontend-app:
-    driver: local
-  nginx-config:
-    driver: local
-  stream-data:
-    driver: local
-  node-modules:
-    driver: local
-  nginx-cache:
-    driver: local

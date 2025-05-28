@@ -4,6 +4,7 @@ services:
   # RTSP Stream Backend Service
   rtsp-backend:
     image: node:18-alpine
+    build: ./backend
     container_name: rtsp-stream-backend
     restart: unless-stopped
     ports:
@@ -43,6 +44,7 @@ services:
   # Web Frontend (Nginx)
   rtsp-frontend:
     image: nginx:alpine
+    build: ./frontend
     container_name: rtsp-stream-frontend
     restart: unless-stopped
     ports:

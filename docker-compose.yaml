@@ -12,6 +12,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8080
+      - PGID=100
+      - PUID=1030
     volumes:
       # Synology absolute paths
       - /volume1/docker/rtsp-proxy/backend/server.js:/usr/src/app/server.js:ro
@@ -61,6 +63,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    environment:
+        - PGID=100
+        - PUID=1030
 
 # Networks
 networks:

@@ -55,9 +55,9 @@ services:
     image: busybox:latest
     container_name: rtsp-init-volumes
     volumes:
-      - backend-app:/backend
-      - frontend-app:/frontend
-      - nginx-config:/nginx
+      - /volume1/docker/rtsp-proxy/backend-app:/backend
+      - /volume1/docker/rtsp-proxy/frontend-app:/frontend
+      - /volume1/docker/rtsp-proxy/nginx-config:/nginx
       - ./backend:/src/backend:ro
       - ./frontend:/src/frontend:ro
       - ./nginx.conf:/src/nginx.conf:ro

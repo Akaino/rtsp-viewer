@@ -1,10 +1,10 @@
 # Use Node.js 18 Alpine as base image
-FROM node:19-bullseye-alpine
+FROM node:24-alpine
 
 # Install FFmpeg and other dependencies
-RUN apk upgrade --no-cache
 RUN apk update --no-cache
-RUN apk add --no-cache --update bash
+RUN apk upgrade --no-cache
+RUN apk add --no-cache bash
 RUN apk add --no-cache ffmpeg
 RUN apk add --no-cache curl
 

@@ -1,25 +1,109 @@
-version: '3.9'
+version: '3.8'
 
 services:
-  rtsp-proxy:
-    image: rtsp-viewer-rtsp-proxy:latest
-    container_name: rtsp-hls-proxy
+  # RTSP Stream Backend Service
+  rtsp-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rtsp-stream-backend
     restart: unless-stopped
     ports:
-      - "3010:3000"
-      - "8090:8080"
+      - "8080:8080"
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - WS_PORT=8080
+      - PORT=8080
     volumes:
-      - /volume1/docker/rtsp-proxy/app:/app
-      - /volume1/docker/rtsp-proxy/streams:/app/streams
-      - /volume1/docker/rtsp-proxy/logs:/app/logs
-    working_dir: /app
+      # Use named volumes for Portainer compatibility
+      - backend-app:/usr/src/app
+      - stream-data:/usr/src/app/streams
+      - node-modules:/usr/src/app/node_modules
+    networks:
+      - rtsp-network
     healthcheck:
-      test: curl -f http://localhost:3010/health || exit 1
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
+  # Web Frontend (Nginx)
+  rtsp-frontend:
+    image: nginx:alpine
+    container_name: rtsp-stream-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      # Use named volumes for Portainer compatibility
+      - frontend-app:/usr/share/nginx/html:ro
+      - nginx-config:/etc/nginx/conf.d:ro
+      - nginx-cache:/var/cache/nginx
+    networks:
+      - rtsp-network
+    depends_on:
+      - rtsp-backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
+  # Initialize volumes with required files
+  init-volumes:
+    image: busybox:latest
+    container_name: rtsp-init-volumes
+    volumes:
+      - backend-app:/backend
+      - frontend-app:/frontend
+      - nginx-config:/nginx
+      - ./backend:/src/backend:ro
+      - ./frontend:/src/frontend:ro
+      - ./nginx.conf:/src/nginx.conf:ro
+    command: |
+      sh -c "
+        echo 'Initializing volumes...'
+        # Copy backend files
+        cp -f /src/backend/server.js /backend/
+        cp -f /src/backend/package.json /backend/
+        # Copy frontend files
+        cp -f /src/frontend/index.html /frontend/
+        cp -f /src/frontend/styles.css /frontend/
+        cp -f /src/frontend/app.js /frontend/
+        # Copy nginx config
+        cp -f /src/nginx.conf /nginx/default.conf
+        echo 'Volume initialization complete!'
+      "
+    restart: "no"
 
-      
+# Networks
+networks:
+  rtsp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes - all named for Portainer management
+volumes:
+  backend-app:
+    driver: local
+  frontend-app:
+    driver: local
+  nginx-config:
+    driver: local
+  stream-data:
+    driver: local
+  node-modules:
+    driver: local
+  nginx-cache:
+    driver: local

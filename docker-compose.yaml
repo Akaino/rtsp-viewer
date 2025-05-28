@@ -21,8 +21,6 @@ services:
     networks:
       - rtsp-network
     working_dir: /usr/src/app
-    command: |
-      sh -c "exec node server.js"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
       interval: 30s

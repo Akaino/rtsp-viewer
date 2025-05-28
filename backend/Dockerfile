@@ -2,12 +2,10 @@
 FROM node:18-alpine
 
 # Install FFmpeg and other dependencies
-RUN apk update && \
-    apk add --no-cache \
+RUN apk add --no-cache \
     ffmpeg \
     curl \
-    bash \
-    && rm -rf /var/cache/apk/*
+    bash
 
 # Create app directory
 WORKDIR /usr/src/app

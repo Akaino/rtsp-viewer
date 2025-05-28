@@ -22,19 +22,7 @@ services:
       - rtsp-network
     working_dir: /usr/src/app
     command: |
-      sh -c "
-        # Install FFmpeg if not present
-        which ffmpeg || (apk update && apk add --no-cache ffmpeg curl bash)
-        
-        # Install npm dependencies if needed
-        if [ ! -d node_modules ] || [ ! -f node_modules/.bin/nodemon ]; then
-          echo 'Installing npm dependencies...'
-          npm install --production
-        fi
-        
-        # Start the server
-        exec node server.js
-      "
+      sh -c "exec node server.js"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/health"]
       interval: 30s

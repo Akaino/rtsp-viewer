@@ -2,7 +2,8 @@
 FROM node:19-bullseye
 
 # Install FFmpeg and other dependencies
-RUN apk add bash
+RUN apk update 
+RUN apk add --update bash
 RUN apk add ffmpeg
 RUN apk add curl
 

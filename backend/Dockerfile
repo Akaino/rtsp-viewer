@@ -24,8 +24,8 @@ RUN mkdir -p /usr/src/app/streams
 COPY server.js ./
 
 # Create a non-root user to run the app
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
+RUN addgroup -g 1030 -S nodejs && \
+    adduser -S nodejs -u 100 && \
     chown -R nodejs:nodejs /usr/src/app
 
 # Switch to non-root user

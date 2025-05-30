@@ -261,7 +261,7 @@ app.post('/api/stream', (req, res) => {
                 }
             });
         }
-    }, 5000); // 30 second timeout
+    }, 10000); // 30 second timeout
 });
 
 app.post('/api/stream/stop', (req, res) => {

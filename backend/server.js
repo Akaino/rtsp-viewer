@@ -124,7 +124,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.post('/api/stream', (req, res) => {
-    const { rtspUrl } = req.body;
+    const { rtspUrl, name } = req.body;
     
     if (!rtspUrl) {
         return res.status(400).json({ error: 'RTSP URL is required' });
@@ -180,6 +180,7 @@ app.post('/api/stream', (req, res) => {
     activeStreams.set(streamId, {
         process: ffmpeg,
         rtspUrl: rtspUrl,
+        name: name || `Stream ${streamId}`,
         startTime: new Date()
     });
     
@@ -187,6 +188,7 @@ app.post('/api/stream', (req, res) => {
     res.json({
         streamId: streamId,
         streamUrl: `/streams/${streamId}/playlist.m3u8`,
+        name: name || `Stream ${streamId}`,
         message: 'Stream processing started'
     });
     
@@ -247,8 +249,10 @@ app.get('/api/streams', (req, res) => {
     const streams = Array.from(activeStreams.entries()).map(([id, stream]) => ({
         id: id,
         rtspUrl: stream.rtspUrl,
+        name: stream.name,
         startTime: stream.startTime,
-        uptime: Date.now() - stream.startTime.getTime()
+        uptime: Date.now() - stream.startTime.getTime(),
+        streamUrl: `/streams/${id}/playlist.m3u8`
     }));
     
     res.json(streams);

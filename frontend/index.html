@@ -5,43 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RTSP Stream Viewer</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
     <div class="header">
         <h1>🎥 RTSP Stream Viewer</h1>
+        <div class="layout-controls">
+            <button class="layout-btn" data-layout="1" onclick="setLayout(1)">Single</button>
+            <button class="layout-btn active" data-layout="2" onclick="setLayout(2)">2x1</button>
+            <button class="layout-btn" data-layout="4" onclick="setLayout(4)">2x2</button>
+        </div>
     </div>
     
     <div class="container">
         <div class="controls">
             <div class="input-group">
+                <input type="text" id="streamName" placeholder="Stream name (optional)" />
                 <input type="text" id="rtspUrl" placeholder="Enter RTSP URL (e.g., rtsp://example.com:554/stream)" />
             </div>
             <div class="button-group">
-                <button id="connectBtn" class="btn-primary" onclick="connectStream()">Connect Stream</button>
-                <button id="disconnectBtn" class="btn-secondary" onclick="disconnectStream()" disabled>Disconnect</button>
+                <button id="addStreamBtn" class="btn-primary" onclick="addStream()">Add Stream</button>
+                <button id="clearAllBtn" class="btn-secondary" onclick="clearAllStreams()">Clear All</button>
             </div>
             <div id="status" class="status info" style="display: none;"></div>
         </div>
         
-        <div class="video-container">
-            <div class="placeholder" id="placeholder">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="4" width="20" height="16" rx="2"/>
-                    <polygon points="10 8 16 12 10 16"/>
-                </svg>
-                <p>Enter an RTSP URL and click Connect to start streaming</p>
-            </div>
-            <div class="loading" id="loading" style="display: none;">
-                <div class="spinner"></div>
-                <p>Connecting to stream...</p>
-            </div>
-            <video id="videoPlayer" style="display: none;" controls autoplay muted></video>
+        <div class="active-streams" id="activeStreams" style="display: none;">
+            <h3>Active Streams</h3>
+            <div id="streamsList"></div>
+        </div>
+        
+        <div class="streams-grid" id="streamsGrid">
+            <!-- Stream containers will be added dynamically -->
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="app.js"></script>
-    
-    
 </body>
 </html>

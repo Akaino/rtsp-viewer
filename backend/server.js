@@ -137,29 +137,42 @@ app.post('/api/stream', (req, res) => {
     // Create directory for this stream
     fs.mkdirSync(outputPath, { recursive: true });
     
+    // Create initial empty playlist to avoid 404
+    const playlistPath = path.join(outputPath, 'playlist.m3u8');
+    const initialPlaylist = `#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:0
+`;
+    fs.writeFileSync(playlistPath, initialPlaylist);
+    
     // FFmpeg command to convert RTSP to HLS
     // Try with more robust error handling for HEVC streams
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
-        '-fflags', '+genpts+discardcorrupt',  // Generate timestamps and discard corrupt frames
+        '-fflags', '+genpts+discardcorrupt',
         '-i', rtspUrl,
-        '-c:v', 'libx264',        // Transcode to H.264
-        '-preset', 'ultrafast',    // Fastest encoding
-        '-tune', 'zerolatency',    // Low latency
-        '-b:v', '2M',             // Set bitrate to 2 Mbps
-        '-maxrate', '2M',         // Max bitrate
-        '-bufsize', '4M',         // Buffer size
-        '-pix_fmt', 'yuv420p',    // Ensure compatible pixel format
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-tune', 'zerolatency',
+        '-b:v', '2M',
+        '-maxrate', '2M',
+        '-bufsize', '4M',
+        '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
-        '-b:a', '128k',           // Audio bitrate
+        '-b:a', '128k',
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '10',
         '-hls_flags', 'delete_segments+append_list',
         '-hls_segment_type', 'mpegts',
+        '-hls_start_number_source', 'epoch',
+        '-start_number', '0',
         '-hls_segment_filename', path.join(outputPath, 'segment%03d.ts'),
         path.join(outputPath, 'playlist.m3u8')
     ];
+    
+    console.log('Starting FFmpeg with args:', ffmpegArgs);
     
     const ffmpeg = spawn('ffmpeg', ffmpegArgs);
     
@@ -170,27 +183,12 @@ app.post('/api/stream', (req, res) => {
         startTime: new Date()
     });
     
-    let playlistCreated = false;
-    let responseSent = false;
-    const playlistPath = path.join(outputPath, 'playlist.m3u8');
-    
-    // Monitor for playlist creation
-    const checkInterval = setInterval(() => {
-        if (fs.existsSync(playlistPath) && !responseSent) {
-            playlistCreated = true;
-            responseSent = true;
-            clearInterval(checkInterval);
-            
-            console.log(`Playlist created at: ${playlistPath}`);
-            console.log(`Stream directory contents:`, fs.readdirSync(outputPath));
-            
-            res.json({
-                streamId: streamId,
-                streamUrl: `/streams/${streamId}/playlist.m3u8`,
-                message: 'Stream processing started'
-            });
-        }
-    }, 500); // Check every 500ms
+    // Return response immediately since we created the playlist
+    res.json({
+        streamId: streamId,
+        streamUrl: `/streams/${streamId}/playlist.m3u8`,
+        message: 'Stream processing started'
+    });
     
     ffmpeg.stderr.on('data', (data) => {
         console.log(`FFmpeg output: ${data}`);
@@ -198,16 +196,7 @@ app.post('/api/stream', (req, res) => {
     
     ffmpeg.on('error', (error) => {
         console.error(`FFmpeg error: ${error}`);
-        clearInterval(checkInterval);
         activeStreams.delete(streamId);
-        
-        if (!responseSent) {
-            responseSent = true;
-            res.status(500).json({
-                error: 'FFmpeg failed to start',
-                message: error.message
-            });
-        }
         
         // Notify connected clients
         wss.clients.forEach(client => {
@@ -223,16 +212,7 @@ app.post('/api/stream', (req, res) => {
     
     ffmpeg.on('close', (code) => {
         console.log(`FFmpeg process exited with code ${code}`);
-        clearInterval(checkInterval);
         activeStreams.delete(streamId);
-        
-        if (!responseSent) {
-            responseSent = true;
-            res.status(500).json({
-                error: 'FFmpeg exited unexpectedly',
-                message: `Process exited with code ${code}`
-            });
-        }
         
         // Clean up stream files after a delay
         setTimeout(() => {
@@ -241,27 +221,6 @@ app.post('/api/stream', (req, res) => {
             });
         }, 5000);
     });
-    
-    // Set a longer timeout
-    setTimeout(() => {
-        clearInterval(checkInterval);
-        if (!responseSent) {
-            responseSent = true;
-            
-            // Check what files were created
-            const files = fs.existsSync(outputPath) ? fs.readdirSync(outputPath) : [];
-            console.log(`Timeout reached. Files in ${outputPath}:`, files);
-            
-            res.status(500).json({
-                error: 'Failed to start stream processing',
-                message: 'Playlist file was not created in time',
-                debug: {
-                    outputPath: outputPath,
-                    filesCreated: files
-                }
-            });
-        }
-    }, 10000); // 30 second timeout
 });
 
 app.post('/api/stream/stop', (req, res) => {

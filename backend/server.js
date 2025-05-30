@@ -43,6 +43,30 @@ app.use('/streams', express.static(STREAM_DIR, {
     }
 }));
 
+// Fallback route to debug 404s
+app.use('/streams/*', (req, res) => {
+    const requestedPath = req.path.replace('/streams/', '');
+    const fullPath = path.join(STREAM_DIR, requestedPath);
+    
+    console.log('404 Debug:', {
+        requestedPath: req.path,
+        streamDir: STREAM_DIR,
+        fullPath: fullPath,
+        exists: fs.existsSync(fullPath),
+        dirContents: fs.existsSync(path.dirname(fullPath)) ? fs.readdirSync(path.dirname(fullPath)) : 'Dir not found'
+    });
+    
+    res.status(404).json({
+        error: 'File not found',
+        requested: req.path,
+        debug: {
+            streamDir: STREAM_DIR,
+            fullPath: fullPath,
+            exists: fs.existsSync(fullPath)
+        }
+    });
+});
+
 // Log the streams directory path for debugging
 console.log('Streams directory:', STREAM_DIR);
 console.log('Directory exists:', fs.existsSync(STREAM_DIR));

@@ -51,24 +51,24 @@ app.use('/streams', express.static(STREAM_DIR, {
     }
 }));
 
-// Fallback route to debug 404s
-app.use('/streams/*', (req, res) => {
-    const requestedPath = req.path.replace('/streams/', '');
-    const fullPath = path.join(STREAM_DIR, requestedPath);
+// Debug route - must come AFTER the static middleware
+app.get('/streams/*', (req, res) => {
+    const fullUrl = req.originalUrl || req.url;
+    const streamPath = fullUrl.replace('/streams/', '');
+    const fullPath = path.join(STREAM_DIR, streamPath);
     
     console.log('404 Debug:', {
-        requestedPath: req.path,
-        requestedFile: requestedPath,
-        streamDir: STREAM_DIR,
+        originalUrl: req.originalUrl,
+        url: req.url,
+        streamPath: streamPath,
         fullPath: fullPath,
         exists: fs.existsSync(fullPath),
-        parentDirExists: fs.existsSync(path.dirname(fullPath)),
         dirContents: fs.existsSync(STREAM_DIR) ? fs.readdirSync(STREAM_DIR) : 'Streams dir not found'
     });
     
     res.status(404).json({
         error: 'File not found',
-        requested: req.path,
+        requested: fullUrl,
         debug: {
             streamDir: STREAM_DIR,
             fullPath: fullPath,

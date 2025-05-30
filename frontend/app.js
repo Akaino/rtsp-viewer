@@ -163,28 +163,61 @@ function createStreamPlayer(container, streamData) {
     `;
     
     const video = document.getElementById(`video-${streamId}`);
-    const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90
-    });
     
-    hls.loadSource(streamUrl);
-    hls.attachMedia(video);
-    
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play();
-    });
-    
-    hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-            console.error('HLS Error:', data);
-            showStatus(`Stream error: ${data.type}`, 'error');
-        }
-    });
-    
-    // Store HLS instance
-    activeStreams.set(streamId, { hls, container, streamData });
+    // Add a delay to allow FFmpeg to create segments
+    setTimeout(() => {
+        const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90,
+            manifestLoadingRetryDelay: 1000,
+            levelLoadingRetryDelay: 1000,
+            fragLoadingRetryDelay: 1000
+        });
+        
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+        
+        let retryCount = 0;
+        const maxRetries = 10;
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play();
+        });
+        
+        hls.on(Hls.Events.ERROR, (event, data) => {
+            if (data.fatal) {
+                switch(data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        if (data.details === 'levelEmptyError' && retryCount < maxRetries) {
+                            // Playlist is empty, retry
+                            retryCount++;
+                            console.log(`Empty playlist, retrying... (${retryCount}/${maxRetries})`);
+                            setTimeout(() => {
+                                hls.startLoad();
+                            }, 1000);
+                            return;
+                        }
+                        console.error('Network error:', data);
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        console.log('Media error, attempting recovery...');
+                        hls.recoverMediaError();
+                        return;
+                    default:
+                        console.error('Fatal error:', data);
+                        break;
+                }
+                
+                if (retryCount >= maxRetries) {
+                    showStatus(`Stream error: Failed to load stream after ${maxRetries} attempts`, 'error');
+                }
+            }
+        });
+        
+        // Store HLS instance
+        activeStreams.set(streamId, { hls, container, streamData });
+    }, 2000); // Wait 2 seconds before starting HLS
 }
 
 function stopStream(streamId) {

@@ -137,15 +137,6 @@ app.post('/api/stream', (req, res) => {
     // Create directory for this stream
     fs.mkdirSync(outputPath, { recursive: true });
     
-    // Create initial empty playlist to avoid 404
-    const playlistPath = path.join(outputPath, 'playlist.m3u8');
-    const initialPlaylist = `#EXTM3U
-#EXT-X-VERSION:3
-#EXT-X-TARGETDURATION:2
-#EXT-X-MEDIA-SEQUENCE:0
-`;
-    fs.writeFileSync(playlistPath, initialPlaylist);
-    
     // FFmpeg command to convert RTSP to HLS
     // Try with more robust error handling for HEVC streams
     const ffmpegArgs = [
@@ -184,13 +175,37 @@ app.post('/api/stream', (req, res) => {
         startTime: new Date()
     });
     
-    // Return response immediately since we created the playlist
-    res.json({
-        streamId: streamId,
-        streamUrl: `/streams/${streamId}/playlist.m3u8`,
-        name: name || `Stream ${streamId}`,
-        message: 'Stream processing started'
-    });
+    // Wait for playlist to be created by FFmpeg
+    let checkCount = 0;
+    const maxChecks = 30; // 15 seconds maximum
+    const checkInterval = setInterval(() => {
+        const playlistPath = path.join(outputPath, 'playlist.m3u8');
+        checkCount++;
+        
+        if (fs.existsSync(playlistPath)) {
+            // Check if playlist has segments
+            const content = fs.readFileSync(playlistPath, 'utf8');
+            if (content.includes('.ts')) {
+                clearInterval(checkInterval);
+                res.json({
+                    streamId: streamId,
+                    streamUrl: `/streams/${streamId}/playlist.m3u8`,
+                    name: name || `Stream ${streamId}`,
+                    message: 'Stream processing started'
+                });
+            }
+        }
+        
+        if (checkCount >= maxChecks) {
+            clearInterval(checkInterval);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    error: 'Stream failed to start',
+                    message: 'No video segments were generated'
+                });
+            }
+        }
+    }, 500);
     
     ffmpeg.stderr.on('data', (data) => {
         console.log(`FFmpeg output: ${data}`);

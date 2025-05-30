@@ -1,7 +1,6 @@
 let hls = null;
 let reconnectInterval = null;
 const backendUrl = window.location.protocol + '//' + window.location.hostname + ':8080';
-
 function showStatus(message, type) {
     const status = document.getElementById('status');
     status.textContent = message;

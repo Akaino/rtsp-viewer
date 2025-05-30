@@ -150,6 +150,32 @@ function createStreamContainer(index) {
     return container;
 }
 
+function toggleAuthFields() {
+    const useAuth = document.getElementById('useAuth').checked;
+    const authFields = document.getElementById('authFields');
+    authFields.style.display = useAuth ? 'block' : 'none';
+    
+    if (!useAuth) {
+        // Clear auth fields when disabled
+        document.getElementById('authUsername').value = '';
+        document.getElementById('authPassword').value = '';
+        document.getElementById('useSrtp').checked = false;
+        toggleSrtpFields();
+    }
+}
+
+function toggleSrtpFields() {
+    const useSrtp = document.getElementById('useSrtp').checked;
+    const srtpFields = document.getElementById('srtpFields');
+    srtpFields.style.display = useSrtp ? 'block' : 'none';
+    
+    if (!useSrtp) {
+        // Clear SRTP fields when disabled
+        document.getElementById('srtpSuite').value = '';
+        document.getElementById('srtpKey').value = '';
+    }
+}
+
 function addStream() {
     const nameInput = document.getElementById('streamName');
     const urlInput = document.getElementById('rtspUrl');
@@ -161,9 +187,31 @@ function addStream() {
         return;
     }
 
-    if (!rtspUrl.startsWith('rtsp://')) {
-        showStatus('Invalid RTSP URL. URL must start with rtsp://', 'error');
+    if (!rtspUrl.startsWith('rtsp://') && !rtspUrl.startsWith('rtsps://')) {
+        showStatus('Invalid RTSP URL. URL must start with rtsp:// or rtsps://', 'error');
         return;
+    }
+
+    // Get authentication info
+    const auth = {};
+    if (document.getElementById('useAuth').checked) {
+        auth.username = document.getElementById('authUsername').value.trim();
+        auth.password = document.getElementById('authPassword').value.trim();
+        
+        if (!auth.username || !auth.password) {
+            showStatus('Please enter username and password', 'error');
+            return;
+        }
+        
+        if (document.getElementById('useSrtp').checked) {
+            auth.srtpSuite = document.getElementById('srtpSuite').value;
+            auth.srtpKey = document.getElementById('srtpKey').value.trim();
+            
+            if (!auth.srtpKey) {
+                showStatus('Please enter SRTP key', 'error');
+                return;
+            }
+        }
     }
 
     // Find available container
@@ -179,12 +227,14 @@ function addStream() {
     // Clear inputs
     nameInput.value = '';
     urlInput.value = '';
+    document.getElementById('useAuth').checked = false;
+    toggleAuthFields();
     
     // Start stream
-    startStream(rtspUrl, name, availableContainer);
+    startStream(rtspUrl, name, availableContainer, auth);
 }
 
-function startStream(rtspUrl, name, container) {
+function startStream(rtspUrl, name, container, auth = {}) {
     // Show loading
     container.innerHTML = `
         <div class="stream-loading">
@@ -201,6 +251,7 @@ function startStream(rtspUrl, name, container) {
         body: JSON.stringify({ 
             rtspUrl, 
             name,
+            auth,
             settings: {
                 videoBitrate: streamSettings.videoBitrate,
                 preset: streamSettings.preset,
@@ -542,6 +593,18 @@ function restoreRunningStreams() {
             console.error('Error restoring streams:', error);
         });
 }
+
+// Export functions for use in HTML onclick handlers
+window.toggleAuthFields = toggleAuthFields;
+window.toggleSrtpFields = toggleSrtpFields;
+window.addStream = addStream;
+window.stopStream = stopStream;
+window.clearAllStreams = clearAllStreams;
+window.setLayout = setLayout;
+window.toggleSettings = toggleSettings;
+window.saveSettings = saveSettings;
+window.resetSettings = resetSettings;
+window.restoreStream = restoreStream;
 
 function restoreStream(streamId, name, streamUrl) {
     // Find available container

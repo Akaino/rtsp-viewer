@@ -124,7 +124,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.post('/api/stream', (req, res) => {
-    const { rtspUrl, name, settings = {} } = req.body;
+    const { rtspUrl, name, settings = {}, auth = {} } = req.body;
     
     if (!rtspUrl) {
         return res.status(400).json({ error: 'RTSP URL is required' });
@@ -153,7 +153,44 @@ app.post('/api/stream', (req, res) => {
         '-rtsp_transport', 'tcp',
         '-fflags', '+genpts+discardcorrupt',
         '-flags', 'low_delay',
-        '-i', rtspUrl,
+    ];
+    
+    // Add SRTP authentication if provided
+    if (auth.username && auth.password) {
+        ffmpegArgs.push('-rtsp_flags', 'listen');
+        ffmpegArgs.push('-timeout', '10000000'); // 10 seconds timeout
+    }
+    
+    // Add authentication to URL if needed
+    let inputUrl = rtspUrl;
+    if (auth.username && auth.password) {
+        // Parse URL and add authentication
+        const urlParts = rtspUrl.match(/^(rtsp:\/\/)(.*)$/);
+        if (urlParts) {
+            inputUrl = `${urlParts[1]}${encodeURIComponent(auth.username)}:${encodeURIComponent(auth.password)}@${urlParts[2]}`;
+        }
+    }
+    
+    // Add crypto parameters for SRTP if specified
+    if (auth.srtpKey || auth.srtpSuite) {
+        // For SRTP, we need to use rtsps:// protocol
+        if (inputUrl.startsWith('rtsp://')) {
+            inputUrl = inputUrl.replace('rtsp://', 'rtsps://');
+        }
+        
+        if (auth.srtpSuite) {
+            ffmpegArgs.push('-srtp_out_suite', auth.srtpSuite);
+            ffmpegArgs.push('-srtp_in_suite', auth.srtpSuite);
+        }
+        
+        if (auth.srtpKey) {
+            ffmpegArgs.push('-srtp_out_params', auth.srtpKey);
+            ffmpegArgs.push('-srtp_in_params', auth.srtpKey);
+        }
+    }
+    
+    ffmpegArgs.push(
+        '-i', inputUrl,
         '-c:v', streamSettings.videoCodec,
         '-preset', streamSettings.preset,
         '-tune', 'zerolatency',
@@ -173,9 +210,10 @@ app.post('/api/stream', (req, res) => {
         '-start_number', '0',
         '-hls_segment_filename', path.join(outputPath, 'segment%03d.ts'),
         path.join(outputPath, 'playlist.m3u8')
-    ];
+    );
     
     console.log('Starting FFmpeg with settings:', streamSettings);
+    console.log('Using URL:', inputUrl.replace(/:[^:@]+@/, ':****@')); // Log URL with hidden password
     
     const ffmpeg = spawn('ffmpeg', ffmpegArgs);
     

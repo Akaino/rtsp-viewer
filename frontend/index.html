@@ -25,8 +25,78 @@
             <div class="button-group">
                 <button id="addStreamBtn" class="btn-primary" onclick="addStream()">Add Stream</button>
                 <button id="clearAllBtn" class="btn-secondary" onclick="clearAllStreams()">Clear All</button>
+                <button id="toggleSettingsBtn" class="btn-settings" onclick="toggleSettings()">⚙️ Settings</button>
             </div>
             <div id="status" class="status info" style="display: none;"></div>
+        </div>
+        
+        <div class="settings-panel" id="settingsPanel" style="display: none;">
+            <h3>Stream Settings</h3>
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <h4>FFmpeg Settings</h4>
+                    <label>
+                        Video Bitrate
+                        <select id="videoBitrate">
+                            <option value="0.5M">500 Kbps (Low)</option>
+                            <option value="1M">1 Mbps</option>
+                            <option value="2M" selected>2 Mbps (Default)</option>
+                            <option value="3M">3 Mbps</option>
+                            <option value="5M">5 Mbps (High)</option>
+                        </select>
+                    </label>
+                    <label>
+                        Encoding Preset
+                        <select id="preset">
+                            <option value="ultrafast" selected>Ultra Fast (Low CPU)</option>
+                            <option value="superfast">Super Fast</option>
+                            <option value="veryfast">Very Fast</option>
+                            <option value="faster">Faster</option>
+                            <option value="fast">Fast (Better Quality)</option>
+                        </select>
+                    </label>
+                    <label>
+                        Segment Duration
+                        <select id="segmentDuration">
+                            <option value="0.5">0.5s (Lowest Latency)</option>
+                            <option value="1" selected>1s (Low Latency)</option>
+                            <option value="2">2s (Balanced)</option>
+                            <option value="4">4s (Stable)</option>
+                        </select>
+                    </label>
+                    <label>
+                        Playlist Size
+                        <input type="number" id="playlistSize" value="5" min="3" max="20">
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <h4>Player Settings</h4>
+                    <label>
+                        Buffer Length (seconds)
+                        <input type="number" id="maxBufferLength" value="3" min="1" max="10" step="0.5">
+                    </label>
+                    <label>
+                        Back Buffer (seconds)
+                        <input type="number" id="backBufferLength" value="30" min="0" max="120" step="10">
+                    </label>
+                    <label>
+                        Live Sync Duration
+                        <input type="number" id="liveSyncDuration" value="3" min="1" max="10">
+                    </label>
+                    <label>
+                        Playback Mode
+                        <select id="playbackMode">
+                            <option value="smooth" selected>Smooth (Buffered)</option>
+                            <option value="lowlatency">Low Latency</option>
+                            <option value="realtime">Real-time (May Buffer)</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+            <div class="settings-actions">
+                <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+                <button class="btn-secondary" onclick="resetSettings()">Reset to Defaults</button>
+            </div>
         </div>
         
         <div class="active-streams" id="activeStreams" style="display: none;">

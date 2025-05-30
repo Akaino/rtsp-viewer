@@ -1,65 +1,84 @@
-function restoreStream(streamId, name, streamUrl) {
-    // Find available container
-    const grid = document.getElementById('streamsGrid');
-    const containers = Array.from(grid.children);
-    const availableContainer = containers.find(c => !c.dataset.streamId);
-    
-    if (!availableContainer) {
-        showStatus('All stream slots are full. Remove a stream or increase layout size.', 'error');
-        return;
-    }
-    
-    const streamData = {
-        streamId: streamId,
-        streamUrl: streamUrl,
-        name: name
-    };
-    
-    createStreamPlayer(availableContainer, streamData);
-    showStatus(`Stream "${name}" restored`, 'success');
-    
-    // Update the streams list
-    loadActiveStreams();
-}function restoreRunningStreams() {
-    // Fetch all running streams from backend
-    fetch('/api/streams')
-        .then(response => response.json())
-        .then(streams => {
-            if (streams.length === 0) return;
-            
-            // Adjust layout if needed
-            if (streams.length > currentLayout) {
-                const newLayout = streams.length <= 2 ? 2 : 4;
-                setLayout(newLayout);
-            }
-            
-            // Restore each stream
-            const grid = document.getElementById('streamsGrid');
-            const containers = Array.from(grid.children);
-            
-            streams.forEach((stream, index) => {
-                if (index < containers.length) {
-                    const container = containers[index];
-                    const streamData = {
-                        streamId: stream.id,
-                        streamUrl: stream.streamUrl,
-                        name: stream.name
-                    };
-                    createStreamPlayer(container, streamData);
-                }
-            });
-            
-            showStatus(`Restored ${streams.length} active stream(s)`, 'info');
-        })
-        .catch(error => {
-            console.error('Error restoring streams:', error);
-        });
-}// Store active streams
+// Store active streams and settings
 const activeStreams = new Map();
 let currentLayout = 2;
+let streamSettings = {
+    // FFmpeg settings
+    videoBitrate: '2M',
+    preset: 'ultrafast',
+    segmentDuration: 1,
+    playlistSize: 5,
+    bufferSize: '2M',
+    // HLS.js settings
+    maxBufferLength: 3,
+    backBufferLength: 30,
+    liveSyncDuration: 3,
+    playbackMode: 'smooth'
+};
+
+// Load settings from localStorage
+function loadSettings() {
+    const saved = localStorage.getItem('streamSettings');
+    if (saved) {
+        streamSettings = { ...streamSettings, ...JSON.parse(saved) };
+        applySettingsToUI();
+    }
+}
+
+// Save settings to localStorage
+function saveSettings() {
+    // Get values from UI
+    streamSettings.videoBitrate = document.getElementById('videoBitrate').value;
+    streamSettings.preset = document.getElementById('preset').value;
+    streamSettings.segmentDuration = parseFloat(document.getElementById('segmentDuration').value);
+    streamSettings.playlistSize = parseInt(document.getElementById('playlistSize').value);
+    streamSettings.maxBufferLength = parseFloat(document.getElementById('maxBufferLength').value);
+    streamSettings.backBufferLength = parseFloat(document.getElementById('backBufferLength').value);
+    streamSettings.liveSyncDuration = parseInt(document.getElementById('liveSyncDuration').value);
+    streamSettings.playbackMode = document.getElementById('playbackMode').value;
+    
+    // Save to localStorage
+    localStorage.setItem('streamSettings', JSON.stringify(streamSettings));
+    showStatus('Settings saved successfully', 'success');
+}
+
+// Apply settings to UI elements
+function applySettingsToUI() {
+    document.getElementById('videoBitrate').value = streamSettings.videoBitrate;
+    document.getElementById('preset').value = streamSettings.preset;
+    document.getElementById('segmentDuration').value = streamSettings.segmentDuration;
+    document.getElementById('playlistSize').value = streamSettings.playlistSize;
+    document.getElementById('maxBufferLength').value = streamSettings.maxBufferLength;
+    document.getElementById('backBufferLength').value = streamSettings.backBufferLength;
+    document.getElementById('liveSyncDuration').value = streamSettings.liveSyncDuration;
+    document.getElementById('playbackMode').value = streamSettings.playbackMode;
+}
+
+// Reset settings to defaults
+function resetSettings() {
+    streamSettings = {
+        videoBitrate: '2M',
+        preset: 'ultrafast',
+        segmentDuration: 1,
+        playlistSize: 5,
+        bufferSize: '2M',
+        maxBufferLength: 3,
+        backBufferLength: 30,
+        liveSyncDuration: 3,
+        playbackMode: 'smooth'
+    };
+    applySettingsToUI();
+    saveSettings();
+}
+
+// Toggle settings panel
+function toggleSettings() {
+    const panel = document.getElementById('settingsPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
     setLayout(2);
     loadActiveStreams();
     restoreRunningStreams();
@@ -179,7 +198,17 @@ function startStream(rtspUrl, name, container) {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ rtspUrl, name })
+        body: JSON.stringify({ 
+            rtspUrl, 
+            name,
+            settings: {
+                videoBitrate: streamSettings.videoBitrate,
+                preset: streamSettings.preset,
+                segmentDuration: streamSettings.segmentDuration,
+                playlistSize: streamSettings.playlistSize,
+                bufferSize: streamSettings.bufferSize
+            }
+        })
     })
     .then(response => response.json())
     .then(data => {
@@ -221,36 +250,94 @@ function createStreamPlayer(container, streamData) {
     
     const video = document.getElementById(`video-${streamId}`);
     
+    // Configure HLS.js based on playback mode
+    let hlsConfig = {
+        enableWorker: true,
+        lowLatencyMode: true,
+        testBandwidth: false,
+        startLevel: -1
+    };
+    
+    switch(streamSettings.playbackMode) {
+        case 'realtime':
+            // Aggressive settings for lowest latency
+            hlsConfig = {
+                ...hlsConfig,
+                backBufferLength: 0,
+                maxBufferLength: 0.5,
+                maxMaxBufferLength: 1,
+                maxBufferSize: 0,
+                maxBufferHole: 0.1,
+                highBufferWatchdogPeriod: 1,
+                nudgeOffset: 0.1,
+                nudgeMaxRetry: 10,
+                maxFragLookUpTolerance: 0.1,
+                liveSyncDurationCount: 1,
+                liveMaxLatencyDurationCount: 2,
+                liveDurationInfinity: false,
+                fragLoadingTimeOut: 2000,
+                fragLoadingMaxRetry: 2,
+                fragLoadingRetryDelay: 500
+            };
+            break;
+        case 'lowlatency':
+            // Balanced for low latency with some stability
+            hlsConfig = {
+                ...hlsConfig,
+                backBufferLength: 10,
+                maxBufferLength: streamSettings.maxBufferLength * 0.5,
+                maxMaxBufferLength: streamSettings.maxBufferLength,
+                maxBufferSize: 30 * 1000 * 1000,
+                maxBufferHole: 0.3,
+                highBufferWatchdogPeriod: 2,
+                nudgeOffset: 0.1,
+                nudgeMaxRetry: 5,
+                maxFragLookUpTolerance: 0.2,
+                liveSyncDurationCount: 2,
+                liveMaxLatencyDurationCount: 4,
+                liveDurationInfinity: true,
+                fragLoadingTimeOut: 10000,
+                fragLoadingMaxRetry: 3,
+                fragLoadingRetryDelay: 1000
+            };
+            break;
+        case 'smooth':
+        default:
+            // Stable playback with configurable buffer
+            hlsConfig = {
+                ...hlsConfig,
+                backBufferLength: streamSettings.backBufferLength,
+                maxBufferLength: streamSettings.maxBufferLength,
+                maxMaxBufferLength: streamSettings.maxBufferLength * 2,
+                maxBufferSize: 60 * 1000 * 1000,
+                maxBufferHole: 0.5,
+                highBufferWatchdogPeriod: 2,
+                nudgeOffset: 0.1,
+                nudgeMaxRetry: 3,
+                maxFragLookUpTolerance: 0.25,
+                liveSyncDurationCount: streamSettings.liveSyncDuration,
+                liveMaxLatencyDurationCount: streamSettings.liveSyncDuration * 2,
+                liveDurationInfinity: true,
+                fragLoadingTimeOut: 20000,
+                fragLoadingMaxRetry: 3,
+                fragLoadingRetryDelay: 1000
+            };
+    }
+    
+    // Add common retry settings
+    hlsConfig = {
+        ...hlsConfig,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1000
+    };
+    
     // Add a small delay to allow FFmpeg to create initial segments
     setTimeout(() => {
-        const hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-            backBufferLength: 30,              // Keep 30 seconds of back buffer
-            maxBufferLength: 3,                // 3 seconds of forward buffer
-            maxMaxBufferLength: 5,             // Maximum 5 seconds
-            maxBufferSize: 60 * 1000 * 1000,  // 60 MB buffer
-            maxBufferHole: 0.5,                // Allow small gaps
-            highBufferWatchdogPeriod: 2,
-            nudgeOffset: 0.1,
-            nudgeMaxRetry: 3,
-            maxFragLookUpTolerance: 0.25,
-            liveSyncDurationCount: 3,          // Stay within 3 segments of live
-            liveMaxLatencyDurationCount: 5,    // Maximum 5 segments behind
-            liveDurationInfinity: true,
-            preferManagedMediaSource: false,
-            testBandwidth: false,
-            startLevel: -1,
-            fragLoadingTimeOut: 20000,         // 20 second timeout
-            fragLoadingMaxRetry: 3,
-            fragLoadingRetryDelay: 1000,
-            manifestLoadingTimeOut: 10000,
-            manifestLoadingMaxRetry: 3,
-            manifestLoadingRetryDelay: 1000,
-            levelLoadingTimeOut: 10000,
-            levelLoadingMaxRetry: 3,
-            levelLoadingRetryDelay: 1000
-        });
+        const hls = new Hls(hlsConfig);
         
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
@@ -260,24 +347,59 @@ function createStreamPlayer(container, streamData) {
         
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play();
+            
+            // For real-time mode, jump to live edge
+            if (streamSettings.playbackMode === 'realtime' && video.buffered.length > 0) {
+                const liveEdge = video.buffered.end(video.buffered.length - 1);
+                video.currentTime = liveEdge;
+            }
         });
         
-        // Periodically check if we're falling behind live edge
-        setInterval(() => {
-            if (video.buffered.length > 0) {
-                const liveEdge = video.buffered.end(video.buffered.length - 1);
-                const delay = liveEdge - video.currentTime;
-                
-                // If we're more than 5 seconds behind, gently speed up
-                if (delay > 5) {
-                    video.playbackRate = 1.1;
-                } else if (delay > 3) {
-                    video.playbackRate = 1.05;
-                } else {
-                    video.playbackRate = 1.0;
+        // Handle live sync based on mode
+        if (streamSettings.playbackMode === 'realtime') {
+            // Aggressive live edge seeking
+            hls.on(Hls.Events.FRAG_LOADED, () => {
+                if (video.buffered.length > 0) {
+                    const liveEdge = video.buffered.end(video.buffered.length - 1);
+                    const delay = liveEdge - video.currentTime;
+                    if (delay > 0.5) {
+                        video.currentTime = liveEdge - 0.1;
+                    }
                 }
-            }
-        }, 5000);
+            });
+        } else if (streamSettings.playbackMode === 'lowlatency') {
+            // Moderate catch-up using playback rate
+            setInterval(() => {
+                if (video.buffered.length > 0) {
+                    const liveEdge = video.buffered.end(video.buffered.length - 1);
+                    const delay = liveEdge - video.currentTime;
+                    
+                    if (delay > 3) {
+                        video.playbackRate = 1.1;
+                    } else if (delay > 2) {
+                        video.playbackRate = 1.05;
+                    } else {
+                        video.playbackRate = 1.0;
+                    }
+                }
+            }, 3000);
+        } else {
+            // Smooth mode: gentle catch-up
+            setInterval(() => {
+                if (video.buffered.length > 0) {
+                    const liveEdge = video.buffered.end(video.buffered.length - 1);
+                    const delay = liveEdge - video.currentTime;
+                    
+                    if (delay > streamSettings.liveSyncDuration * 2) {
+                        video.playbackRate = 1.1;
+                    } else if (delay > streamSettings.liveSyncDuration) {
+                        video.playbackRate = 1.05;
+                    } else {
+                        video.playbackRate = 1.0;
+                    }
+                }
+            }, 5000);
+        }
         
         hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.fatal) {
@@ -383,6 +505,66 @@ function loadActiveStreams() {
         .catch(error => {
             console.error('Error loading streams:', error);
         });
+}
+
+function restoreRunningStreams() {
+    // Fetch all running streams from backend
+    fetch('/api/streams')
+        .then(response => response.json())
+        .then(streams => {
+            if (streams.length === 0) return;
+            
+            // Adjust layout if needed
+            if (streams.length > currentLayout) {
+                const newLayout = streams.length <= 2 ? 2 : 4;
+                setLayout(newLayout);
+            }
+            
+            // Restore each stream
+            const grid = document.getElementById('streamsGrid');
+            const containers = Array.from(grid.children);
+            
+            streams.forEach((stream, index) => {
+                if (index < containers.length) {
+                    const container = containers[index];
+                    const streamData = {
+                        streamId: stream.id,
+                        streamUrl: stream.streamUrl,
+                        name: stream.name
+                    };
+                    createStreamPlayer(container, streamData);
+                }
+            });
+            
+            showStatus(`Restored ${streams.length} active stream(s)`, 'info');
+        })
+        .catch(error => {
+            console.error('Error restoring streams:', error);
+        });
+}
+
+function restoreStream(streamId, name, streamUrl) {
+    // Find available container
+    const grid = document.getElementById('streamsGrid');
+    const containers = Array.from(grid.children);
+    const availableContainer = containers.find(c => !c.dataset.streamId);
+    
+    if (!availableContainer) {
+        showStatus('All stream slots are full. Remove a stream or increase layout size.', 'error');
+        return;
+    }
+    
+    const streamData = {
+        streamId: streamId,
+        streamUrl: streamUrl,
+        name: name
+    };
+    
+    createStreamPlayer(availableContainer, streamData);
+    showStatus(`Stream "${name}" restored`, 'success');
+    
+    // Update the streams list
+    loadActiveStreams();
 }
 
 // Handle Enter key in input fields

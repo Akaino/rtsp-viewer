@@ -124,11 +124,22 @@ app.get('/api/health', (req, res) => {
 });
 
 app.post('/api/stream', (req, res) => {
-    const { rtspUrl, name } = req.body;
+    const { rtspUrl, name, settings = {} } = req.body;
     
     if (!rtspUrl) {
         return res.status(400).json({ error: 'RTSP URL is required' });
     }
+    
+    // Default settings
+    const streamSettings = {
+        videoCodec: 'libx264',
+        preset: settings.preset || 'ultrafast',
+        videoBitrate: settings.videoBitrate || '2M',
+        segmentDuration: settings.segmentDuration || 1,
+        playlistSize: settings.playlistSize || 5,
+        bufferSize: settings.bufferSize || '2M',
+        ...settings
+    };
     
     // Generate unique stream ID
     const streamId = Date.now().toString();
@@ -137,25 +148,25 @@ app.post('/api/stream', (req, res) => {
     // Create directory for this stream
     fs.mkdirSync(outputPath, { recursive: true });
     
-    // FFmpeg command balanced for low latency and stability
+    // FFmpeg command with dynamic settings
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
         '-fflags', '+genpts+discardcorrupt',
         '-flags', 'low_delay',
         '-i', rtspUrl,
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
+        '-c:v', streamSettings.videoCodec,
+        '-preset', streamSettings.preset,
         '-tune', 'zerolatency',
         '-x264opts', 'keyint=30:min-keyint=30:scenecut=-1',
-        '-b:v', '2M',
-        '-maxrate', '2.5M',
-        '-bufsize', '2M',
+        '-b:v', streamSettings.videoBitrate,
+        '-maxrate', `${parseInt(streamSettings.videoBitrate) * 1.25}M`,
+        '-bufsize', streamSettings.bufferSize,
         '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-b:a', '128k',
         '-f', 'hls',
-        '-hls_time', '1',                      // 1 second segments
-        '-hls_list_size', '5',                 // Keep 5 segments
+        '-hls_time', streamSettings.segmentDuration.toString(),
+        '-hls_list_size', streamSettings.playlistSize.toString(),
         '-hls_flags', 'delete_segments+append_list',
         '-hls_segment_type', 'mpegts',
         '-hls_start_number_source', 'epoch',
@@ -164,15 +175,16 @@ app.post('/api/stream', (req, res) => {
         path.join(outputPath, 'playlist.m3u8')
     ];
     
-    console.log('Starting FFmpeg with args:', ffmpegArgs);
+    console.log('Starting FFmpeg with settings:', streamSettings);
     
     const ffmpeg = spawn('ffmpeg', ffmpegArgs);
     
-    // Store the process
+    // Store the process with settings
     activeStreams.set(streamId, {
         process: ffmpeg,
         rtspUrl: rtspUrl,
         name: name || `Stream ${streamId}`,
+        settings: streamSettings,
         startTime: new Date()
     });
     
@@ -192,6 +204,7 @@ app.post('/api/stream', (req, res) => {
                     streamId: streamId,
                     streamUrl: `/streams/${streamId}/playlist.m3u8`,
                     name: name || `Stream ${streamId}`,
+                    settings: streamSettings,
                     message: 'Stream processing started'
                 });
             }
@@ -266,6 +279,7 @@ app.get('/api/streams', (req, res) => {
         id: id,
         rtspUrl: stream.rtspUrl,
         name: stream.name,
+        settings: stream.settings,
         startTime: stream.startTime,
         uptime: Date.now() - stream.startTime.getTime(),
         streamUrl: `/streams/${id}/playlist.m3u8`

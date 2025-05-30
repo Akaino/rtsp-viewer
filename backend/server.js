@@ -170,14 +170,23 @@ app.post('/api/stream', (req, res) => {
         startTime: new Date()
     });
     
+    let playlistCreated = false;
+    const playlistPath = path.join(outputPath, 'playlist.m3u8');
+    
     ffmpeg.stderr.on('data', (data) => {
         console.log(`FFmpeg output: ${data}`);
         
-        // Check if playlist file has been created
-        const playlistPath = path.join(outputPath, 'playlist.m3u8');
-        if (fs.existsSync(playlistPath)) {
+        // Check if playlist has been created
+        if (!playlistCreated && fs.existsSync(playlistPath)) {
+            playlistCreated = true;
             console.log(`Playlist created at: ${playlistPath}`);
-            console.log(`Stream directory contents:`, fs.readdirSync(outputPath));
+            
+            // Send response once playlist is ready
+            res.json({
+                streamId: streamId,
+                streamUrl: `/streams/${streamId}/playlist.m3u8`,
+                message: 'Stream processing started'
+            });
         }
     });
     
@@ -209,14 +218,15 @@ app.post('/api/stream', (req, res) => {
         }, 5000);
     });
     
-    // Wait a moment for FFmpeg to start processing
+    // Set a timeout in case playlist is never created
     setTimeout(() => {
-        res.json({
-            streamId: streamId,
-            streamUrl: `/streams/${streamId}/playlist.m3u8`,
-            message: 'Stream processing started'
-        });
-    }, 1000);
+        if (!res.headersSent) {
+            res.status(500).json({
+                error: 'Failed to start stream processing',
+                message: 'Playlist file was not created in time'
+            });
+        }
+    }, 10000); // 10 second timeout
 });
 
 app.post('/api/stream/stop', (req, res) => {

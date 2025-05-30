@@ -107,7 +107,10 @@ app.post('/api/stream', (req, res) => {
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
         '-i', rtspUrl,
-        '-c:v', 'copy',
+        '-c:v', 'libx264',        // Transcode to H.264 instead of copying
+        '-preset', 'ultrafast',    // Fastest encoding for low latency
+        '-tune', 'zerolatency',    // Optimize for low latency
+        '-crf', '23',             // Quality setting (lower = better, 23 is default)
         '-c:a', 'aac',
         '-f', 'hls',
         '-hls_time', '2',

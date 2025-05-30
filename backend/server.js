@@ -21,7 +21,31 @@ if (!fs.existsSync(STREAM_DIR)) {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/streams', express.static(STREAM_DIR));
+
+// Debug middleware to log requests
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`);
+    next();
+});
+
+app.use('/streams', express.static(STREAM_DIR, {
+    setHeaders: (res, path) => {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Range');
+        res.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+        
+        if (path.endsWith('.m3u8')) {
+            res.set('Content-Type', 'application/vnd.apple.mpegurl');
+        } else if (path.endsWith('.ts')) {
+            res.set('Content-Type', 'video/mp2t');
+        }
+    }
+}));
+
+// Log the streams directory path for debugging
+console.log('Streams directory:', STREAM_DIR);
+console.log('Directory exists:', fs.existsSync(STREAM_DIR));
 
 // Store active FFmpeg processes
 const activeStreams = new Map();

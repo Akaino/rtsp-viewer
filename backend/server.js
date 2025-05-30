@@ -171,28 +171,43 @@ app.post('/api/stream', (req, res) => {
     });
     
     let playlistCreated = false;
+    let responseSent = false;
     const playlistPath = path.join(outputPath, 'playlist.m3u8');
     
-    ffmpeg.stderr.on('data', (data) => {
-        console.log(`FFmpeg output: ${data}`);
-        
-        // Check if playlist has been created
-        if (!playlistCreated && fs.existsSync(playlistPath)) {
+    // Monitor for playlist creation
+    const checkInterval = setInterval(() => {
+        if (fs.existsSync(playlistPath) && !responseSent) {
             playlistCreated = true;
-            console.log(`Playlist created at: ${playlistPath}`);
+            responseSent = true;
+            clearInterval(checkInterval);
             
-            // Send response once playlist is ready
+            console.log(`Playlist created at: ${playlistPath}`);
+            console.log(`Stream directory contents:`, fs.readdirSync(outputPath));
+            
             res.json({
                 streamId: streamId,
                 streamUrl: `/streams/${streamId}/playlist.m3u8`,
                 message: 'Stream processing started'
             });
         }
+    }, 500); // Check every 500ms
+    
+    ffmpeg.stderr.on('data', (data) => {
+        console.log(`FFmpeg output: ${data}`);
     });
     
     ffmpeg.on('error', (error) => {
         console.error(`FFmpeg error: ${error}`);
+        clearInterval(checkInterval);
         activeStreams.delete(streamId);
+        
+        if (!responseSent) {
+            responseSent = true;
+            res.status(500).json({
+                error: 'FFmpeg failed to start',
+                message: error.message
+            });
+        }
         
         // Notify connected clients
         wss.clients.forEach(client => {
@@ -208,7 +223,16 @@ app.post('/api/stream', (req, res) => {
     
     ffmpeg.on('close', (code) => {
         console.log(`FFmpeg process exited with code ${code}`);
+        clearInterval(checkInterval);
         activeStreams.delete(streamId);
+        
+        if (!responseSent) {
+            responseSent = true;
+            res.status(500).json({
+                error: 'FFmpeg exited unexpectedly',
+                message: `Process exited with code ${code}`
+            });
+        }
         
         // Clean up stream files after a delay
         setTimeout(() => {
@@ -218,15 +242,26 @@ app.post('/api/stream', (req, res) => {
         }, 5000);
     });
     
-    // Set a timeout in case playlist is never created
+    // Set a longer timeout
     setTimeout(() => {
-        if (!res.headersSent) {
+        clearInterval(checkInterval);
+        if (!responseSent) {
+            responseSent = true;
+            
+            // Check what files were created
+            const files = fs.existsSync(outputPath) ? fs.readdirSync(outputPath) : [];
+            console.log(`Timeout reached. Files in ${outputPath}:`, files);
+            
             res.status(500).json({
                 error: 'Failed to start stream processing',
-                message: 'Playlist file was not created in time'
+                message: 'Playlist file was not created in time',
+                debug: {
+                    outputPath: outputPath,
+                    filesCreated: files
+                }
             });
         }
-    }, 10000); // 10 second timeout
+    }, 5000); // 30 second timeout
 });
 
 app.post('/api/stream/stop', (req, res) => {

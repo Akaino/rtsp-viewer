@@ -103,15 +103,21 @@ app.post('/api/stream', (req, res) => {
     // Create directory for this stream
     fs.mkdirSync(outputPath, { recursive: true });
     
-    // FFmpeg command to convert RTSP to HLS
+     // FFmpeg command to convert RTSP to HLS
+    // Try with more robust error handling for HEVC streams
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
+        '-fflags', '+genpts+discardcorrupt',  // Generate timestamps and discard corrupt frames
         '-i', rtspUrl,
-        '-c:v', 'libx264',        // Transcode to H.264 instead of copying
-        '-preset', 'ultrafast',    // Fastest encoding for low latency
-        '-tune', 'zerolatency',    // Optimize for low latency
-        '-crf', '23',             // Quality setting (lower = better, 23 is default)
+        '-c:v', 'libx264',        // Transcode to H.264
+        '-preset', 'ultrafast',    // Fastest encoding
+        '-tune', 'zerolatency',    // Low latency
+        '-b:v', '2M',             // Set bitrate to 2 Mbps
+        '-maxrate', '2M',         // Max bitrate
+        '-bufsize', '4M',         // Buffer size
+        '-pix_fmt', 'yuv420p',    // Ensure compatible pixel format
         '-c:a', 'aac',
+        '-b:a', '128k',           // Audio bitrate
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '10',

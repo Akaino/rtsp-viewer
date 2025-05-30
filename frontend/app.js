@@ -225,28 +225,31 @@ function createStreamPlayer(container, streamData) {
     setTimeout(() => {
         const hls = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,              // Enable low latency mode
-            backBufferLength: 0,               // Don't keep old segments in buffer
-            maxBufferLength: 1,                // Maximum 1 second of buffer
-            maxMaxBufferLength: 2,             // Absolute maximum buffer
-            maxBufferSize: 0,                  // Disable size-based buffer limit
-            maxBufferHole: 0.1,                // Small tolerance for buffer holes
-            highBufferWatchdogPeriod: 1,       // Check buffer health every second
-            nudgeOffset: 0.1,                  // Small nudge to catch up
-            nudgeMaxRetry: 10,                 // Keep trying to reduce latency
-            maxFragLookUpTolerance: 0.1,       // Tight fragment lookup
-            liveSyncDurationCount: 1,          // Stay close to live edge
-            liveMaxLatencyDurationCount: 3,    // Maximum 3 segments behind live
-            liveDurationInfinity: false,       // Don't use infinite live duration
-            preferManagedMediaSource: true,
-            testBandwidth: false,              // Skip bandwidth test for faster start
-            startLevel: -1,                    // Auto quality selection
-            fragLoadingTimeOut: 2000,          // Faster timeout for fragments
-            fragLoadingMaxRetry: 2,            // Fewer retries
-            fragLoadingRetryDelay: 500,        // Faster retry
-            manifestLoadingTimeOut: 2000,
-            manifestLoadingMaxRetry: 2,
-            manifestLoadingRetryDelay: 500
+            lowLatencyMode: true,
+            backBufferLength: 30,              // Keep 30 seconds of back buffer
+            maxBufferLength: 3,                // 3 seconds of forward buffer
+            maxMaxBufferLength: 5,             // Maximum 5 seconds
+            maxBufferSize: 60 * 1000 * 1000,  // 60 MB buffer
+            maxBufferHole: 0.5,                // Allow small gaps
+            highBufferWatchdogPeriod: 2,
+            nudgeOffset: 0.1,
+            nudgeMaxRetry: 3,
+            maxFragLookUpTolerance: 0.25,
+            liveSyncDurationCount: 3,          // Stay within 3 segments of live
+            liveMaxLatencyDurationCount: 5,    // Maximum 5 segments behind
+            liveDurationInfinity: true,
+            preferManagedMediaSource: false,
+            testBandwidth: false,
+            startLevel: -1,
+            fragLoadingTimeOut: 20000,         // 20 second timeout
+            fragLoadingMaxRetry: 3,
+            fragLoadingRetryDelay: 1000,
+            manifestLoadingTimeOut: 10000,
+            manifestLoadingMaxRetry: 3,
+            manifestLoadingRetryDelay: 1000,
+            levelLoadingTimeOut: 10000,
+            levelLoadingMaxRetry: 3,
+            levelLoadingRetryDelay: 1000
         });
         
         hls.loadSource(streamUrl);
@@ -257,26 +260,24 @@ function createStreamPlayer(container, streamData) {
         
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play();
-            
-            // Force live edge
-            if (video.buffered.length > 0) {
-                const liveEdge = video.buffered.end(video.buffered.length - 1);
-                video.currentTime = liveEdge;
-            }
         });
         
-        hls.on(Hls.Events.FRAG_LOADED, () => {
-            // Keep jumping to live edge to minimize delay
+        // Periodically check if we're falling behind live edge
+        setInterval(() => {
             if (video.buffered.length > 0) {
                 const liveEdge = video.buffered.end(video.buffered.length - 1);
                 const delay = liveEdge - video.currentTime;
                 
-                // If we're more than 0.5 seconds behind, jump to live
-                if (delay > 0.5) {
-                    video.currentTime = liveEdge - 0.1;
+                // If we're more than 5 seconds behind, gently speed up
+                if (delay > 5) {
+                    video.playbackRate = 1.1;
+                } else if (delay > 3) {
+                    video.playbackRate = 1.05;
+                } else {
+                    video.playbackRate = 1.0;
                 }
             }
-        });
+        }, 5000);
         
         hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.fatal) {
@@ -287,7 +288,7 @@ function createStreamPlayer(container, streamData) {
                             console.log(`Empty playlist, retrying... (${retryCount}/${maxRetries})`);
                             setTimeout(() => {
                                 hls.startLoad();
-                            }, 500);
+                            }, 1000);
                             return;
                         }
                         console.error('Network error:', data);
@@ -309,7 +310,7 @@ function createStreamPlayer(container, streamData) {
         
         // Store HLS instance
         activeStreams.set(streamId, { hls, container, streamData });
-    }, 1000); // Reduced delay to 1 second
+    }, 1500);
 }
 
 function stopStream(streamId) {

@@ -137,27 +137,26 @@ app.post('/api/stream', (req, res) => {
     // Create directory for this stream
     fs.mkdirSync(outputPath, { recursive: true });
     
-    // FFmpeg command optimized for low latency
+    // FFmpeg command balanced for low latency and stability
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
-        '-fflags', 'nobuffer+flush_packets',  // Reduce buffering
-        '-flags', 'low_delay',                 // Enable low delay mode
-        '-strict', 'experimental',
+        '-fflags', '+genpts+discardcorrupt',
+        '-flags', 'low_delay',
         '-i', rtspUrl,
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-tune', 'zerolatency',
-        '-x264opts', 'keyint=30:min-keyint=30:scenecut=-1',  // Fixed GOP for consistent segments
+        '-x264opts', 'keyint=30:min-keyint=30:scenecut=-1',
         '-b:v', '2M',
-        '-maxrate', '2M',
-        '-bufsize', '1M',                      // Smaller buffer for lower latency
+        '-maxrate', '2.5M',
+        '-bufsize', '2M',
         '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-b:a', '128k',
         '-f', 'hls',
-        '-hls_time', '1',                      // 1 second segments instead of 2
-        '-hls_list_size', '3',                 // Keep only 3 segments in playlist
-        '-hls_flags', 'delete_segments+append_list+omit_endlist',
+        '-hls_time', '1',                      // 1 second segments
+        '-hls_list_size', '5',                 // Keep 5 segments
+        '-hls_flags', 'delete_segments+append_list',
         '-hls_segment_type', 'mpegts',
         '-hls_start_number_source', 'epoch',
         '-start_number', '0',

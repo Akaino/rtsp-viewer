@@ -1,4 +1,60 @@
-// Store active streams
+function restoreStream(streamId, name, streamUrl) {
+    // Find available container
+    const grid = document.getElementById('streamsGrid');
+    const containers = Array.from(grid.children);
+    const availableContainer = containers.find(c => !c.dataset.streamId);
+    
+    if (!availableContainer) {
+        showStatus('All stream slots are full. Remove a stream or increase layout size.', 'error');
+        return;
+    }
+    
+    const streamData = {
+        streamId: streamId,
+        streamUrl: streamUrl,
+        name: name
+    };
+    
+    createStreamPlayer(availableContainer, streamData);
+    showStatus(`Stream "${name}" restored`, 'success');
+    
+    // Update the streams list
+    loadActiveStreams();
+}function restoreRunningStreams() {
+    // Fetch all running streams from backend
+    fetch('/api/streams')
+        .then(response => response.json())
+        .then(streams => {
+            if (streams.length === 0) return;
+            
+            // Adjust layout if needed
+            if (streams.length > currentLayout) {
+                const newLayout = streams.length <= 2 ? 2 : 4;
+                setLayout(newLayout);
+            }
+            
+            // Restore each stream
+            const grid = document.getElementById('streamsGrid');
+            const containers = Array.from(grid.children);
+            
+            streams.forEach((stream, index) => {
+                if (index < containers.length) {
+                    const container = containers[index];
+                    const streamData = {
+                        streamId: stream.id,
+                        streamUrl: stream.streamUrl,
+                        name: stream.name
+                    };
+                    createStreamPlayer(container, streamData);
+                }
+            });
+            
+            showStatus(`Restored ${streams.length} active stream(s)`, 'info');
+        })
+        .catch(error => {
+            console.error('Error restoring streams:', error);
+        });
+}// Store active streams
 const activeStreams = new Map();
 let currentLayout = 2;
 
@@ -6,6 +62,7 @@ let currentLayout = 2;
 document.addEventListener('DOMContentLoaded', () => {
     setLayout(2);
     loadActiveStreams();
+    restoreRunningStreams();
 });
 
 function showStatus(message, type) {
@@ -270,17 +327,22 @@ function loadActiveStreams() {
             }
             
             activeStreamsDiv.style.display = 'block';
-            streamsList.innerHTML = streams.map(stream => `
-                <div class="stream-item">
-                    <div class="stream-info">
-                        <div class="stream-name">${stream.name}</div>
-                        <div class="stream-url">${stream.rtspUrl}</div>
+            streamsList.innerHTML = streams.map(stream => {
+                // Check if this stream is already displayed
+                const isDisplayed = activeStreams.has(stream.id);
+                return `
+                    <div class="stream-item">
+                        <div class="stream-info">
+                            <div class="stream-name">${stream.name}</div>
+                            <div class="stream-url">${stream.rtspUrl}</div>
+                        </div>
+                        <div class="stream-actions">
+                            ${!isDisplayed ? `<button class="btn-small btn-primary" onclick="restoreStream('${stream.id}', '${stream.name}', '${stream.streamUrl}')">View</button>` : ''}
+                            <button class="btn-small btn-stop" onclick="stopStream('${stream.id}')">Stop</button>
+                        </div>
                     </div>
-                    <div class="stream-actions">
-                        <button class="btn-small btn-stop" onclick="stopStream('${stream.id}')">Stop</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         })
         .catch(error => {
             console.error('Error loading streams:', error);

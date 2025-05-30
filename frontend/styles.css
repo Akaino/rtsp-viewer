@@ -224,6 +224,16 @@ button:active::before {
     transition: all 0.3s ease;
 }
 
+.btn-primary {
+    background: linear-gradient(135deg, #4a9eff 0%, #3a7edd 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
+}
+
 .btn-stop {
     background: #dc3545;
     color: white;

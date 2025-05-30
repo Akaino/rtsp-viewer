@@ -221,15 +221,32 @@ function createStreamPlayer(container, streamData) {
     
     const video = document.getElementById(`video-${streamId}`);
     
-    // Add a delay to allow FFmpeg to create segments
+    // Add a small delay to allow FFmpeg to create initial segments
     setTimeout(() => {
         const hls = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,
-            backBufferLength: 90,
-            manifestLoadingRetryDelay: 1000,
-            levelLoadingRetryDelay: 1000,
-            fragLoadingRetryDelay: 1000
+            lowLatencyMode: true,              // Enable low latency mode
+            backBufferLength: 0,               // Don't keep old segments in buffer
+            maxBufferLength: 1,                // Maximum 1 second of buffer
+            maxMaxBufferLength: 2,             // Absolute maximum buffer
+            maxBufferSize: 0,                  // Disable size-based buffer limit
+            maxBufferHole: 0.1,                // Small tolerance for buffer holes
+            highBufferWatchdogPeriod: 1,       // Check buffer health every second
+            nudgeOffset: 0.1,                  // Small nudge to catch up
+            nudgeMaxRetry: 10,                 // Keep trying to reduce latency
+            maxFragLookUpTolerance: 0.1,       // Tight fragment lookup
+            liveSyncDurationCount: 1,          // Stay close to live edge
+            liveMaxLatencyDurationCount: 3,    // Maximum 3 segments behind live
+            liveDurationInfinity: false,       // Don't use infinite live duration
+            preferManagedMediaSource: true,
+            testBandwidth: false,              // Skip bandwidth test for faster start
+            startLevel: -1,                    // Auto quality selection
+            fragLoadingTimeOut: 2000,          // Faster timeout for fragments
+            fragLoadingMaxRetry: 2,            // Fewer retries
+            fragLoadingRetryDelay: 500,        // Faster retry
+            manifestLoadingTimeOut: 2000,
+            manifestLoadingMaxRetry: 2,
+            manifestLoadingRetryDelay: 500
         });
         
         hls.loadSource(streamUrl);
@@ -240,6 +257,25 @@ function createStreamPlayer(container, streamData) {
         
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
             video.play();
+            
+            // Force live edge
+            if (video.buffered.length > 0) {
+                const liveEdge = video.buffered.end(video.buffered.length - 1);
+                video.currentTime = liveEdge;
+            }
+        });
+        
+        hls.on(Hls.Events.FRAG_LOADED, () => {
+            // Keep jumping to live edge to minimize delay
+            if (video.buffered.length > 0) {
+                const liveEdge = video.buffered.end(video.buffered.length - 1);
+                const delay = liveEdge - video.currentTime;
+                
+                // If we're more than 0.5 seconds behind, jump to live
+                if (delay > 0.5) {
+                    video.currentTime = liveEdge - 0.1;
+                }
+            }
         });
         
         hls.on(Hls.Events.ERROR, (event, data) => {
@@ -247,12 +283,11 @@ function createStreamPlayer(container, streamData) {
                 switch(data.type) {
                     case Hls.ErrorTypes.NETWORK_ERROR:
                         if (data.details === 'levelEmptyError' && retryCount < maxRetries) {
-                            // Playlist is empty, retry
                             retryCount++;
                             console.log(`Empty playlist, retrying... (${retryCount}/${maxRetries})`);
                             setTimeout(() => {
                                 hls.startLoad();
-                            }, 1000);
+                            }, 500);
                             return;
                         }
                         console.error('Network error:', data);
@@ -274,7 +309,7 @@ function createStreamPlayer(container, streamData) {
         
         // Store HLS instance
         activeStreams.set(streamId, { hls, container, streamData });
-    }, 2000); // Wait 2 seconds before starting HLS
+    }, 1000); // Reduced delay to 1 second
 }
 
 function stopStream(streamId) {

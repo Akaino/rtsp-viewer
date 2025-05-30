@@ -18,6 +18,13 @@ if (!fs.existsSync(STREAM_DIR)) {
     fs.mkdirSync(STREAM_DIR, { recursive: true });
 }
 
+console.log('Starting server with config:', {
+    workingDir: process.cwd(),
+    __dirname: __dirname,
+    streamDir: STREAM_DIR,
+    streamDirExists: fs.existsSync(STREAM_DIR)
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -28,6 +35,7 @@ app.use((req, res, next) => {
     next();
 });
 
+// Serve static files from streams directory
 app.use('/streams', express.static(STREAM_DIR, {
     setHeaders: (res, path) => {
         res.set('Access-Control-Allow-Origin', '*');
@@ -50,10 +58,12 @@ app.use('/streams/*', (req, res) => {
     
     console.log('404 Debug:', {
         requestedPath: req.path,
+        requestedFile: requestedPath,
         streamDir: STREAM_DIR,
         fullPath: fullPath,
         exists: fs.existsSync(fullPath),
-        dirContents: fs.existsSync(path.dirname(fullPath)) ? fs.readdirSync(path.dirname(fullPath)) : 'Dir not found'
+        parentDirExists: fs.existsSync(path.dirname(fullPath)),
+        dirContents: fs.existsSync(STREAM_DIR) ? fs.readdirSync(STREAM_DIR) : 'Streams dir not found'
     });
     
     res.status(404).json({
@@ -127,7 +137,7 @@ app.post('/api/stream', (req, res) => {
     // Create directory for this stream
     fs.mkdirSync(outputPath, { recursive: true });
     
-     // FFmpeg command to convert RTSP to HLS
+    // FFmpeg command to convert RTSP to HLS
     // Try with more robust error handling for HEVC streams
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
@@ -162,6 +172,13 @@ app.post('/api/stream', (req, res) => {
     
     ffmpeg.stderr.on('data', (data) => {
         console.log(`FFmpeg output: ${data}`);
+        
+        // Check if playlist file has been created
+        const playlistPath = path.join(outputPath, 'playlist.m3u8');
+        if (fs.existsSync(playlistPath)) {
+            console.log(`Playlist created at: ${playlistPath}`);
+            console.log(`Stream directory contents:`, fs.readdirSync(outputPath));
+        }
     });
     
     ffmpeg.on('error', (error) => {
@@ -199,7 +216,7 @@ app.post('/api/stream', (req, res) => {
             streamUrl: `/streams/${streamId}/playlist.m3u8`,
             message: 'Stream processing started'
         });
-    }, 100);
+    }, 1000);
 });
 
 app.post('/api/stream/stop', (req, res) => {
